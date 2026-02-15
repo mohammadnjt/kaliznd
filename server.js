@@ -6,9 +6,12 @@ const morgan = require('morgan');
 const https = require('https');
 const fs = require('fs');
 require('dotenv').config();
+const swaggerSpec = require('./config/swagger');
+const swaggerUi = require('swagger-ui-express');
 
 // Import routes
 const authRoutes = require('./routes/auth.routes');
+const productRoutes = require('./routes/product.routes');
 // const userRoutes = require('./routes/user.routes');
 // const uploadRoutes = require('./routes/uploader.routes');
 
@@ -23,21 +26,24 @@ app.use(helmet());
 app.use(morgan('dev'));
 
 // Connect to MongoDB
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://mongodbg:27017/starter', {
+mongoose.connect(process.env.MONGODB_URI || 'mongodb://mongodbg:27017/kaliz', {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 })
 .then(() => console.log('Connected to MongoDB'))
 .catch(err => console.error('Could not connect to MongoDB', err));
 
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/product', productRoutes);
 // app.use('/api/uploader', uploadRoutes);
 // app.use('/api/users', userRoutes);
 
 // Root route
 app.get('/', (req, res) => {
-  res.send('Welcome to Starter API');
+  res.send('Welcome to Kaliz API');
 });
 
 // Error handling middleware
@@ -51,7 +57,7 @@ const PORT = process.env.PORT || 3030;
 const HTTPS_PORT = process.env.HTTPS_PORT || 3031;
 
 // HTTP Server
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`HTTP Server running on port ${PORT}`);
 });
 

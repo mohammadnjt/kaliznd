@@ -1,160 +1,116 @@
+const Employee = require('../models/employee.model');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const User = require('../models/user.model');
-const { adminSchema} = require('../validations/auth.validation');
 
-// ثبت ادمین جدید
+const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_key';
+
+// ثبت ادمین
 exports.registerAdmin = async (req, res) => {
   try {
-    // اعتبارسنجی داده‌ها با Joi
-    const { error, value } = adminSchema.validate(req.body, { abortEarly: false });
-    if (error) {
-      return res.status(400).json({
-        message: "خطا در اعتبارسنجی اطلاعات",
-        details: error.details.map(d => d.message)
-      });
+    const { name, phone, password } = req.body;
+
+    if (!name || !password) {
+      return res.status(400).json({ message: 'نام و پسورد الزامی است' });
     }
 
-    const { firstName, lastName, email, phone, nationalId, password } = value;
+    const exists = phone
+      ? await Employee.findOne({ phone })
+      : null;
 
-    // بررسی وجود ایمیل یا کد ملی تکراری
-    const existingUser = await User.findOne({
-      $or: [{ email }, { nationalId }]
-    });
-    if (existingUser) {
-      return res.status(400).json({ message: "کاربری با این ایمیل یا کد ملی وجود دارد" });
+    if (exists) {
+      return res.status(409).json({ message: 'این شماره قبلا ثبت شده' });
     }
 
-    // هش کردن پسورد
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hash = await bcrypt.hash(password, 10);
 
-    // ایجاد کاربر ادمین
-    const adminUser = new User({
-      firstName,
-      lastName,
-      email,
+    const admin = await Employee.create({
+      name,
       phone,
-      nationalId,
-      password: hashedPassword,
-      role: "admin",
-      isActive: true
+      password: hash,
+      role: 'admin',
     });
-
-    await adminUser.save();
 
     res.status(201).json({
-      message: "ادمین جدید با موفقیت ثبت شد",
-      admin: {
-        id: adminUser._id,
-        firstName: adminUser.firstName,
-        lastName: adminUser.lastName,
-        email: adminUser.email,
-        phone: adminUser.phone,
-        nationalId: adminUser.nationalId,
-        role: adminUser.role
-      }
+      message: 'ادمین با موفقیت ساخته شد',
+      data: {
+        id: admin._id,
+        name: admin.name,
+        role: admin.role,
+        phone: admin.phone,
+      },
     });
-
-  } catch (error) {
-    console.error("❌ خطا در ثبت ادمین:", error);
-    res.status(500).json({ message: "خطای سرور", error: error.message });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'خطای سرور' });
   }
 };
 
-// ورود کاربر
+// لاگین
 exports.login = async (req, res) => {
   try {
-    const { email, phone, password } = req.body;
+    const { phone, password } = req.body;
 
-    // جستجو بر اساس ایمیل یا موبایل
-    let user = await User.findOne({
-      $or: [{ email }, { phone }]
-    });
-
+    const user = await Employee.findOne({ phone });
     if (!user) {
-      return res.status(401).json({ message: "Invalid email/phone or password" });
+      return res.status(401).json({ message: 'کاربر یافت نشد' });
     }
 
-    // بررسی رمز عبور
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-    if (!isPasswordValid) {
-      return res.status(401).json({ message: "Invalid email/phone or password" });
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(401).json({ message: 'رمز عبور اشتباه است' });
     }
 
-    // بررسی فعال بودن حساب
-    if (!user.isActive) {
-      return res.status(403).json({ message: "Your account has been deactivated." });
-    }
-
-    // آماده‌سازی دیتا بدون password
-    const safeUser = {
-      id: user._id,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      role: user.role,
-      email: user.email,
-      phone: user.phone,
-      nationalId: user.nationalId
-    };
-
-    // ایجاد توکن JWT (فقط با داده‌های لازم)
     const token = jwt.sign(
       { id: user._id, role: user.role },
-      process.env.JWT_SECRET || "your-secret-key",
-      { expiresIn: "24h" }
+      JWT_SECRET,
+      { expiresIn: '7d' }
     );
 
-    res.status(200).json({
-      message: "Successful login",
+    res.json({
       token,
-      user: safeUser
+      user: {
+        id: user._id,
+        name: user.name,
+        role: user.role,
+        phone: user.phone,
+      },
     });
-  } catch (error) {
-    console.error("❌ Login Error:", error);
-    res.status(500).json({ message: "Server error", error: error.message });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'خطای سرور' });
   }
 };
 
-// دریافت اطلاعات کاربر فعلی
+// گرفتن پروفایل
 exports.getProfile = async (req, res) => {
   try {
-    const user = await User.findById(req.userId).select('-password');
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-    
-    res.status(200).json(user);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+    const user = await Employee.findById(req.user.id).select('-password');
+    if (!user) return res.status(404).json({ message: 'کاربر پیدا نشد' });
+
+    res.json(user);
+  } catch (err) {
+    res.status(500).json({ message: 'خطای سرور' });
   }
 };
 
 // تغییر رمز عبور
 exports.changePassword = async (req, res) => {
   try {
-    const { currentPassword, newPassword } = req.body;
-    
-    // یافتن کاربر
-    const user = await User.findById(req.userId);
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+    const { oldPassword, newPassword } = req.body;
+
+    const user = await Employee.findById(req.user.id);
+    if (!user) return res.status(404).json({ message: 'کاربر پیدا نشد' });
+
+    const isMatch = await bcrypt.compare(oldPassword, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ message: 'رمز فعلی اشتباه است' });
     }
-    
-    // بررسی رمز عبور فعلی
-    const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
-    if (!isPasswordValid) {
-      return res.status(401).json({ message: 'The current password is incorrect.' });
-    }
-    
-    // هش کردن رمز عبور جدید
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
-    
-    // بروزرسانی رمز عبور
-    user.password = hashedPassword;
+
+    user.password = await bcrypt.hash(newPassword, 10);
     await user.save();
-    
-    res.status(200).json({ message: 'Password changed successfully.' });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+
+    res.json({ message: 'رمز عبور با موفقیت تغییر کرد' });
+  } catch (err) {
+    res.status(500).json({ message: 'خطای سرور' });
   }
 };
