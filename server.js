@@ -12,6 +12,8 @@ const swaggerUi = require('swagger-ui-express');
 // Import routes
 const authRoutes = require('./routes/auth.routes');
 const productRoutes = require('./routes/product.routes');
+const employeesRoutes = require('./routes/employee.routes');
+const customersRoutes = require('./routes/customer.routes');
 // const userRoutes = require('./routes/user.routes');
 // const uploadRoutes = require('./routes/uploader.routes');
 
@@ -38,6 +40,8 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/product', productRoutes);
+app.use('/api/employees', employeesRoutes);
+app.use('/api/customers', customersRoutes);
 // app.use('/api/uploader', uploadRoutes);
 // app.use('/api/users', userRoutes);
 

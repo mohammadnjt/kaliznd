@@ -118,6 +118,6 @@ router.delete('/category/:id', verifyToken, isAdmin, productController.deleteCat
 
 // ingredient
 router.get('/ingredient', verifyToken, isAdmin, productController.getAllIngredients);
-router.delete('/category/:id', verifyToken, isAdmin, productController.deleteIngredient);
+router.delete('/ingredient/:id', verifyToken, isAdmin, productController.deleteIngredient);
 
 module.exports = router;
