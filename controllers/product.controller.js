@@ -66,7 +66,7 @@ async function getOrCreateIngredients(productIngredients = []) {
 
 exports.createProduct = async (req, res) => {
   try {
-    const { name, category, price, product_ingredients } = req.body;
+    const { name, category, img, price, product_ingredients } = req.body;
 
     const categoryId = await getOrCreateCategory(category);
     const ingredients = await getOrCreateIngredients(product_ingredients);
@@ -74,6 +74,7 @@ exports.createProduct = async (req, res) => {
     const product = await Product.create({
       name,
       category: categoryId,
+      img,
       price,
       product_ingredients: ingredients
     });
@@ -129,17 +130,49 @@ exports.updateProduct = async (req, res) => {
 
 exports.getProducts = async (req, res) => {
   try {
-    const { category } = req.query;
+    const {
+      category,
+      page = 1,
+      limit = 10,
+      search = ''
+    } = req.query;
 
     const filter = {};
-    if (category) filter.category = category; // می‌تونه id باشه
 
+    // فیلتر بر اساس دسته‌بندی
+    if (category) {
+      filter.category = category; // ObjectId یا string
+    }
+
+    // سرچ روی نام محصول
+    if (search) {
+      filter.name = { $regex: search, $options: 'i' }; // case-insensitive
+    }
+
+    const pageNumber = parseInt(page, 10);
+    const limitNumber = parseInt(limit, 10);
+    const skip = (pageNumber - 1) * limitNumber;
+
+    // تعداد کل محصولات با این فیلتر
+    const total = await Product.countDocuments(filter);
+
+    // لیست محصولات
     const products = await Product.find(filter)
       .populate('category', 'name img')
       .populate('product_ingredients.ingredient', 'name price img')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limitNumber);
 
-    res.json(products);
+    res.json({
+      data: products,
+      pagination: {
+        total,
+        page: pageNumber,
+        limit: limitNumber,
+        totalPages: Math.ceil(total / limitNumber)
+      }
+    });
   } catch (err) {
     res.status(500).json({
       message: 'خطا در دریافت محصولات',
@@ -147,7 +180,6 @@ exports.getProducts = async (req, res) => {
     });
   }
 };
-
 exports.deleteProduct = async (req, res) => {
   try {
     const product = await Product.findByIdAndDelete(req.params.id);

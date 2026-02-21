@@ -28,8 +28,57 @@ exports.createEmployee = async (req, res) => {
 
 // READ ALL
 exports.getEmployees = async (req, res) => {
-  const list = await Employee.find().select('-password').sort({ createdAt: -1 });
-  res.json(list);
+  try {
+    const {
+      page = 1,
+      limit = 10,
+      search = '',
+      role // فیلتر اختیاری روی نقش: admin | cashier
+    } = req.query;
+
+    const filter = {};
+
+    // فیلتر بر اساس نقش
+    if (role) {
+      filter.role = role;
+    }
+
+    // سرچ روی نام یا شماره تلفن
+    if (search) {
+      filter.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { phone: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    const pageNumber = parseInt(page, 10);
+    const limitNumber = parseInt(limit, 10);
+    const skip = (pageNumber - 1) * limitNumber;
+
+    const total = await Employee.countDocuments(filter);
+
+    const list = await Employee.find(filter)
+      .select('-password')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limitNumber);
+
+    res.json({
+      data: list,
+      pagination: {
+        total,
+        page: pageNumber,
+        limit: limitNumber,
+        totalPages: Math.ceil(total / limitNumber)
+      }
+    });
+  } catch (err) {
+    console.log("err", err)
+    res.status(500).json({
+      message: 'خطا در دریافت کارکنان',
+      error: err.message
+    });
+  }
 };
 
 // READ ONE

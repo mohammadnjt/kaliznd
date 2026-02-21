@@ -12,8 +12,9 @@ const verifyToken = async (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token.replace('Bearer ', ''), process.env.JWT_SECRET || 'your-secret-key');
-    // blhLog("decoded", decoded)
-    req.user =  await User.findById(decoded.id, 'username fullName email role profileImage isActive');
+    blhLog("decoded", decoded)
+    req.user =  await User.findById(decoded.id, 'name role phone');
+    // req.user =  await User.findById(decoded.id, 'username fullName email role profileImage isActive');
     req.userId = decoded.id;
     next();
   } catch (error) {

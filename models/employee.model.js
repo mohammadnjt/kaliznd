@@ -6,7 +6,7 @@ const employeeSchema = new mongoose.Schema({
   phone: { type: String, maxlength: 20, unique: true, sparse: true },
   password: { type: String, required: true },
 
-  gender: { type: String, enum: ['male', 'female', 'other'], default: 'other' },
+  gender: { type: String, enum: ['male', 'female'], default: 'male' },
   birthday: { type: Date, default: null },
 
 }, { timestamps: true });

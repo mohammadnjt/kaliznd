@@ -1,4 +1,4 @@
-const Customer = require('../models/customer.model');
+const Customer = require('../models/customers.model');
 
 // CREATE
 exports.createCustomer = async (req, res) => {
@@ -12,8 +12,49 @@ exports.createCustomer = async (req, res) => {
 
 // READ ALL
 exports.getCustomers = async (req, res) => {
-  const list = await Customer.find().sort({ createdAt: -1 });
-  res.json(list);
+  try {
+    const {
+      page = 1,
+      limit = 10,
+      search = ''
+    } = req.query;
+
+    const filter = {};
+
+    // سرچ روی نام یا شماره تلفن
+    if (search) {
+      filter.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { phone: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    const pageNumber = parseInt(page, 10);
+    const limitNumber = parseInt(limit, 10);
+    const skip = (pageNumber - 1) * limitNumber;
+
+    const total = await Customer.countDocuments(filter);
+
+    const list = await Customer.find(filter)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limitNumber);
+
+    res.json({
+      data: list,
+      pagination: {
+        total,
+        page: pageNumber,
+        limit: limitNumber,
+        totalPages: Math.ceil(total / limitNumber)
+      }
+    });
+  } catch (err) {
+    res.status(500).json({
+      message: 'خطا در دریافت مشتری‌ها',
+      error: err.message
+    });
+  }
 };
 
 // READ ONE
